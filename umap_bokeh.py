@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[15]:
+# In[103]:
 
 
 ### import libraries
 from math import pi
 import pandas as pd
-from bokeh.models import ColorBar,HoverTool, ColumnDataSource
+from bokeh.models import ColorBar,HoverTool, ColumnDataSource, LabelSet
 from bokeh.models.mappers import LinearColorMapper
 from bokeh.palettes import Viridis, Category20c
 from bokeh.transform import cumsum
@@ -30,7 +30,7 @@ def equal_subsample(df, stimu, gt, ag, mfi_low, mfi_high):
     return new_df_2
 
 
-# In[98]:
+# In[111]:
 
 
 seed = 42
@@ -41,7 +41,7 @@ df = pd.concat([umap_df[(umap_df["genotype"]=="WT")&(umap_df["stim"] == "stimula
                 umap_df[(umap_df["genotype"]=="KO")&(umap_df["stim"] == "stimulated")].sample(1250,random_state = seed)], axis=0)
 
 plot = Figure(title="UMAP Analysis", x_axis_label ="umap_dim_1", y_axis_label ="umap_dim_2",
-                plot_width=800, plot_height=800,toolbar_sticky=False, toolbar_location="below")
+                plot_width=700, plot_height=700,toolbar_sticky=False, toolbar_location="below")
 
 plot.title.align = "center"
 plot.title.text_font_size = "18pt"
@@ -58,6 +58,12 @@ plot.yaxis.major_label_text_font_size = '0pt'
 plot.xaxis.axis_label_text_font_size = '0pt'
 plot.yaxis.axis_label_text_font_size = '0pt'
 
+mapper = LinearColorMapper(palette=Viridis[256], low=df["CD62L"].min(), high=df["CD62L"].max()/3)
+cb = ColorBar(color_mapper=mapper, label_standoff=7,major_tick_line_color="black",margin=-10, title="MFI "+"CD62L",
+             title_text_font_size = "8pt",title_text_font_style="bold",major_label_text_font_style="bold")
+
+plot.add_layout(cb, 'right')
+
 colors = {"KO":"#A1C9F4","WT":"#FFB482"}
 
 donut_data = pd.Series(df["genotype"].value_counts()).reset_index().sort_values(by="index")
@@ -67,7 +73,7 @@ donut_data["genotype"] = 110*(donut_data["genotype"]/donut_data["genotype"].sum(
 
 donut_source = ColumnDataSource({elm:donut_data[elm].values for elm in donut_data.columns})
 
-plot2 = Figure(title="WT/KO Ratio",plot_width=400, plot_height=400,toolbar_location=None, x_range=(-.3, .3))
+plot2 = Figure(title="WT/KO Ratio",plot_width=350, plot_height=350,toolbar_location=None, x_range=(-.3, .3))
 plot2.annular_wedge(x=0, y=1,  inner_radius=0.15, outer_radius=0.25, direction="anticlock",
                 start_angle=cumsum('angle', include_zero=True), end_angle=cumsum('angle'),
         line_color="white", fill_color='color', legend_field='index', source=donut_source)
@@ -86,8 +92,13 @@ bar_data["location"] = range(len(bar_data))
 
 bar_source = ColumnDataSource({elm:bar_data[elm].values for elm in bar_data.columns})
 
-plot3 = Figure(title="Population Ratio",plot_width=400, plot_height=400,toolbar_location=None)
-plot3.vbar(x = "location", top = "label", source = bar_source, width=0.5, color ="color", legend_field="index")
+plot3 = Figure(title="Population Ratio",plot_width=350, plot_height=350,toolbar_location=None,
+               y_range = (0,100), y_axis_label = "% of selected cells")
+
+barlabels = LabelSet(x='location', y="label",text='index', level='glyph',text_align="center", source=bar_source, 
+                     render_mode='canvas', y_offset=-0)
+plot3.add_layout(barlabels)
+plot3.vbar(x = "location", top = "label", source = bar_source, width=0.5, color ="color")
 plot3.title.align = "center"
 plot3.title.text_font_size = "18pt"
 plot3.xaxis.axis_label=None
@@ -114,17 +125,13 @@ mfi_slider = RangeSlider(start = umap_df["CD62L"].min(), end = umap_df["CD62L"].
 
 data = df.groupby("genotype").count()["index"].values
 ratios = data/sum(data)
-num_cells = Paragraph(text="Number of cells: " + str(sum(data)))
-ratio_ko = Paragraph(text="KO(% of all cells): "+str("{:0.2f}".format(ratios[0]*100))+"%")
-ratio_wt = Paragraph(text="WT(% of all cells): "+str("{:0.2f}".format(ratios[1]*100))+"%")
+num_cells = Paragraph(text="Selected number of cells: " + str(sum(data)))
+ratio_ko = Paragraph(text="KO(% of selected cells): "+str("{:0.2f}".format(ratios[0]*100))+"%")
+ratio_wt = Paragraph(text="WT(% of selected cells): "+str("{:0.2f}".format(ratios[1]*100))+"%")
 
 source = ColumnDataSource({elm:df[elm].values for elm in df.columns})
 
-mapper = LinearColorMapper(palette=Viridis[256], low=df["CD62L"].min(), high=df["CD62L"].max()/3)
-cb = ColorBar(color_mapper=mapper, label_standoff=7,major_tick_line_color="black",margin=-10, title="MFI "+"CD62L",
-             title_text_font_size = "8pt",title_text_font_style="bold",major_label_text_font_style="bold")
 
-plot.add_layout(cb, 'right')
 
 c = {'field': "CD62L", 'transform': mapper}
 circ = plot.circle("umap_dim_1", "umap_dim_2", size=8, 
@@ -164,14 +171,14 @@ def update_plot():
     new_data = new_df.groupby("genotype").count()["index"]
     new_ratios = new_data/sum(new_data)
     try:
-        ratio_ko.text="KO(% of all cells): "+str("{:0.2f}".format(new_ratios["KO"]*100))+"%"
+        ratio_ko.text="KO(% of selected cells): "+str("{:0.2f}".format(new_ratios["KO"]*100))+"%"
     except: 
-        ratio_ko.text="KO(% of all cells): "+str("0.00")+"%"
+        ratio_ko.text="KO(% of selected cells): "+str("0.00")+"%"
         
     try:
-        ratio_wt.text="WT(% of all cells): "+str("{:0.2f}".format(new_ratios["WT"]*100))+"%"
+        ratio_wt.text="WT(% of selected cells): "+str("{:0.2f}".format(new_ratios["WT"]*100))+"%"
     except:
-        ratio_wt.text="WT(% of all cells): "+str("0.00")+"%"
+        ratio_wt.text="WT(% of selected cells): "+str("0.00")+"%"
         
     num_cells.text="Number of cells: " + str(sum(new_data))
 
