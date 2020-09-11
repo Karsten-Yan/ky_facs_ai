@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[103]:
+# In[1]:
 
 
 ### import libraries
@@ -17,20 +17,21 @@ from bokeh.layouts import row, column, layout
 from bokeh.models.widgets import CheckboxGroup, RadioButtonGroup, Paragraph, RadioGroup, RangeSlider
 
 
-# In[59]:
+# In[2]:
 
 
-def equal_subsample(df, stimu, gt, ag, mfi_low, mfi_high):
-    new_df = df[(df["stim"] == stimu)&
+def equal_subsample(df, gt, ag, mfi_low, mfi_high):
+    new_df = df[
               (df[ag] >= mfi_low)&
-              (df[ag] <= mfi_high)]
+              (df[ag] <= mfi_high)
+    ]
     
     new_df_2 = new_df[new_df["genotype"].isin(gt)]
     
     return new_df_2
 
 
-# In[111]:
+# In[3]:
 
 
 seed = 42
@@ -39,6 +40,9 @@ umap_df = pd.concat([pd.read_csv("data/umap.csv",index_col=0),
 
 df = pd.concat([umap_df[(umap_df["genotype"]=="WT")&(umap_df["stim"] == "stimulated")].sample(1250,random_state = seed),
                 umap_df[(umap_df["genotype"]=="KO")&(umap_df["stim"] == "stimulated")].sample(1250,random_state = seed)], axis=0)
+
+df_unstim = pd.concat([umap_df[(umap_df["genotype"]=="WT")&(umap_df["stim"] == "Unstimulated")].sample(1250,random_state = seed),
+                umap_df[(umap_df["genotype"]=="KO")&(umap_df["stim"] == "Unstimulated")].sample(1250,random_state = seed)], axis=0)
 
 plot = Figure(title="UMAP Analysis", x_axis_label ="umap_dim_1", y_axis_label ="umap_dim_2",
                 plot_width=700, plot_height=700,toolbar_sticky=False, toolbar_location="below")
@@ -141,7 +145,6 @@ circ = plot.circle("umap_dim_1", "umap_dim_2", size=8,
 def update_plot():
     
     selected_types = [types_checkbox.labels[i] for i in types_checkbox.active]
-    new_stim_status =stim_button.labels[stim_button.active]
     
     new_ag_choice = ag_button.labels[ag_button.active]
     
@@ -152,9 +155,12 @@ def update_plot():
     mfi_slider.end = df[new_ag_choice].max()
     mfi_slider.title = new_ag_choice + " MFI"
     
-    new_df = equal_subsample(df, new_stim_status, selected_types,
-                            new_ag_choice, new_mfi_low, new_mfi_high)
-       
+    if stim_button.active == 0:
+        new_df = equal_subsample(df, selected_types,
+                                new_ag_choice, new_mfi_low, new_mfi_high)
+    else: 
+        new_df = equal_subsample(df_unstim, selected_types,
+                                new_ag_choice, new_mfi_low, new_mfi_high)
     new_donut_data = pd.Series(new_df["genotype"].value_counts()).reset_index().sort_values(by="index")
     new_donut_data['angle'] = new_donut_data['genotype']/new_donut_data['genotype'].sum() * 2*pi
     new_donut_data["color"] = new_donut_data["index"].map(colors)
